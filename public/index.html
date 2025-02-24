@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Call App</title>
+    <script src="https://sdk.twilio.com/js/video/releases/2.26.0/twilio-video.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background: #1a1a1a;
+            color: white;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Login Section */
+        .login-section {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 30px;
+            background: #2d2d2d;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .login-section h1 {
+            margin-bottom: 24px;
+            color: #fff;
+            font-size: 24px;
+        }
+
+        .login-section input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            border: 2px solid #3a3a3a;
+            background: #3a3a3a;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .login-section input:focus {
+            outline: none;
+            border-color: #0088ff;
+        }
+
+        /* Call Section */
+        .call-section {
+            display: none;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #2d2d2d;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .control-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: #3a3a3a;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-button:hover {
+            background: #4a4a4a;
+        }
+
+        .control-button.end-call {
+            background: #ff3b30;
+        }
+
+        .control-button.end-call:hover {
+            background: #ff1f1f;
+        }
+
+        /* Users List */
+        .users-panel {
+            background: #2d2d2d;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+
+        .users-panel h3 {
+            margin-bottom: 16px;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .users-list {
+            list-style: none;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: #3a3a3a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .user-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .call-button {
+            background: #0088ff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .call-button:hover {
+            background: #0066cc;
+        }
+
+        /* Status Messages */
+        .status {
+            text-align: center;
+            padding: 12px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            background: #3a3a3a;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .video-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-wrap: wrap;
+            }
+        }
+        .backBtn{
+          border: none;
+          border-radius: 16px;
+          background-color: rgba(0, 70, 0, 0.5);
+          color: white;
+          padding: 8px 16px;
+          cursor: pointer;
+        }
+        .backBtn:hover {
+          opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="backBtn" onclick="goHome()">Back to Home</button>
+        <!-- Login Section -->
+        <div id="login-section" class="login-section">
+            <h1>Join Video Call</h1>
+            <input type="text" id="username" placeholder="Enter your name" autocomplete="off">
+            <button onclick="join()" class="call-button">Join</button>
+        </div>
+
+        <!-- Call Section -->
+        <div id="call-section" class="call-section">
+            <div class="status" id="status"></div>
+            
+            <div class="video-grid">
+                <div class="video-container">
+                    <video id="local-video" autoplay muted></video>
+                    <div class="video-label">You</div>
+                </div>
+                <div class="video-container">
+                    <video id="remote-video" autoplay></video>
+                    <div class="video-label">Remote User</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="control-button" onclick="toggleVideo()" id="video-btn">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button class="control-button" onclick="toggleAudio()" id="audio-btn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button class="control-button end-call" onclick="endCall()">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+
+            <div class="users-panel">
+                <h3>Online Users</h3>
+                <ul id="users-list" class="users-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let username;
+        let room;
+        let localTrack;
+        const SERVER_URL = 'http://localhost:8000'
+        const socket = new WebSocket('ws://localhost:8000');
+
+        socket.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
+            
+            switch(data.type) {
+                case 'userList':
+                    updateUsersList(data.users);
+                    break;
+                case 'incomingCall':
+                    handleIncomingCall(data);
+                    break;
+            }
+        };
+
+        async function join() {
+            username = document.getElementById('username').value.trim();
+            if (!username) return;
+
+            try {
+                // Get Twilio token
+                const response = await fetch(`${SERVER_URL}/token?username=${username}`);
+                const { token } = await response.json();
+
+                console.log(token);
+
+                // Get local video and audio
+                const localTracks = await Twilio.Video.createLocalTracks();
+                const videoTrack = localTracks.find(track => track.kind === 'video');
+                
+                if (videoTrack) {
+                    const localVideo = document.getElementById('local-video');
+                    localVideo.appendChild(videoTrack.attach());
+                }
+
+                // Join WebSocket room
+                socket.send(JSON.stringify({
+                    type: 'join',
+                    username: username
+                }));
+
+                // Show call section
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('call-section').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error joining:', error);
+                alert('Failed to join');
+            }
+        }
+
+        function updateUsersList(users) {
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = users
+                .filter(user => user !== username)
+                .map(user => `
+                    <li class="user-item">
+                        <span>${user}</span>
+                        <button onclick="callUser('${user}')" class="call-button">
+                            <i class="fas fa-phone"></i> Call
+                        </button>
+                    </li>
+                `).join('');
+        }
+
+
+        async function callUser(targetUsername) {
+            const roomName = `room-${Date.now()}`;
+            try {
+                const response = await fetch(`${SERVER_URL}/token?username=${username}`);
+                const { token } = await response.json();
+                
+                room = await Twilio.Video.connect(token, {
+                    name: roomName,
+                    audio: true,
+                    video: true
+                });
+
+                socket.send(JSON.stringify({
+                    type: 'callUser',
+                    target: targetUsername,
+                    username: username,
+                    roomName: roomName
+                }));
+
+                handleRoomConnection(room);
+            } catch (error) {
+                console.error('Error making call:', error);
+            }
+        }
+
+        async function handleIncomingCall(data) {
+            if (confirm(`Incoming call from ${data.from}. Accept?`)) {
+                try {
+                    const response = await fetch(`/token?username=${username}`);
+                    const { token } = await response.json();
+                    
+                    room = await Twilio.Video.connect(token, {
+                        name: data.roomName,
+                        audio: true,
+                        video: true
+                    });
+
+                    handleRoomConnection(room);
+                } catch (error) {
+                    console.error('Error joining call:', error);
+                }
+            }
+        }
+
+        function handleRoomConnection(room) {
+            room.on('participantConnected', participant => {
+                participant.tracks.forEach(publication => {
+                    if (publication.isSubscribed) {
+                        const track = publication.track;
+                        document.getElementById('remote-video').appendChild(track.attach());
+                    }
+                });
+            });
+        }
+
+       // Update status display function
+       function updateStatus(message) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.style.display = message ? 'block' : 'none';
+        }
+
+        // Update toggle functions to change icons
+        function toggleVideo() {
+            if (room) {
+                const videoTrack = Array.from(room.localParticipant.videoTracks.values())[0].track;
+                if (videoTrack) {
+                    videoTrack.enable(!videoTrack.isEnabled);
+                    const btn = document.getElementById('video-btn');
+                    btn.innerHTML = videoTrack.isEnabled ? 
+                        '<i class="fas fa-video"></i>' : 
+                        '<i class="fas fa-video-slash"></i>';
+                }
+            }
+        }
+
+        function toggleAudio() {
+            if (room) {
+                const audioTrack = Array.from(room.localParticipant.audioTracks.values())[0].track;
+                if (audioTrack) {
+                    audioTrack.enable(!audioTrack.isEnabled);
+                    const btn = document.getElementById('audio-btn');
+                    btn.innerHTML = audioTrack.isEnabled ? 
+                        '<i class="fas fa-microphone"></i>' : 
+                        '<i class="fas fa-microphone-slash"></i>';
+                }
+            }
+        }
+
+        function endCall() {
+            if (room) {
+                room.disconnect();
+                document.getElementById('remote-video').innerHTML = '';
+            }
+        }
+
+        function goHome() {
+            console.log(localStorage.getItem("originWindowDir"));
+          window.location.replace(`${localStorage.getItem("originWindowDir")}/index.html`);
+        }
+    </script>
+</body>
+</html>
